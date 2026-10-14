@@ -3,7 +3,7 @@
   ----------------------------------
   - Pripojeni na vMix TCP API (port 8099), SUBSCRIBE TALLY
   - Webove rozhrani: stav, vyber inputu (s nazvy z vMixu), jas, IP vMixu,
-    nazev zarizeni, test LED, nastaveni WiFi
+    nazev zarizeni, identifikace (bliknuti LED), nastaveni WiFi
   - Bez WiFi / prvni spusteni: vlastni WiFi "Tally-XXXX" -> otevri 192.168.4.1
   - Po pripojeni: http://<nazev>.local  (napr. http://tally1.local) nebo IP ze Serial Monitoru
 
@@ -62,8 +62,6 @@ String   xmlBuf;
 std::vector<String> inputTitles;    // index 0 = input 1
 
 unsigned long lastRx = 0, lastPing = 0, lastConnTry = 0, wifiLostAt = 0;
-int           testMode  = -1;       // -1 = bez testu, jinak TallyState
-unsigned long testUntil = 0;
 unsigned long identifyUntil = 0;
 
 float         battV = 0;           // vyhlazene napeti baterie [V]
@@ -125,10 +123,6 @@ void updateLeds() {
     bool on = (now / 150) % 2;
     ledsRaw(on, !on);
     return;
-  }
-  if (testMode >= 0) {
-    if (now < testUntil) { ledsRaw(testMode == T_PROGRAM, testMode == T_PREVIEW); return; }
-    testMode = -1;
   }
   if (apMode && WiFi.status() != WL_CONNECTED) {   // ceka na nastaveni: stridani cervena/zelena
     bool on = (now / 700) % 2;
@@ -479,13 +473,8 @@ void handleScan() {
   server.send(200, "application/json", j);
 }
 
-void handleTest() {
-  String m = server.arg("m");
-  if (m == "identify") identifyUntil = millis() + 3000;
-  else {
-    testMode  = m == "program" ? T_PROGRAM : m == "preview" ? T_PREVIEW : T_OFF;
-    testUntil = millis() + 3000;
-  }
+void handleIdentify() {
+  identifyUntil = millis() + 3000;
   server.send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -510,7 +499,7 @@ input,select,button{font:inherit;color:var(--text);background:#12161b;border:1px
 input[type=range]{padding:0}
 .flex{display:flex;gap:8px}.flex>*{flex:1}
 button{background:var(--acc);border:0;font-weight:600;cursor:pointer;margin-top:12px}
-button.sec{background:#2a313b}button.r{background:var(--red)}button.g{background:var(--green)}
+button.sec{background:#2a313b}
 .msg{font-size:13px;color:var(--mute);min-height:18px;margin-top:6px}
 </style></head><body><main>
 <h1 id="name">vMix Tally</h1><div class="sub" id="sub">&nbsp;</div>
@@ -528,11 +517,7 @@ button.sec{background:#2a313b}button.r{background:var(--red)}button.g{background
   <div class="flex"><select id="input"></select><button class="sec" style="margin:0;flex:0 0 auto;width:auto" onclick="loadInputs(1)">↻</button></div>
   <label>Jas LED: <span id="bv"></span></label>
   <input type="range" id="bright" min="5" max="255" oninput="bv.textContent=Math.round(this.value/2.55)+' %'" onchange="set({bright:this.value})">
-  <div class="flex">
-    <button class="r" onclick="test('program')">Test červená</button>
-    <button class="g" onclick="test('preview')">Test zelená</button>
-    <button class="sec" onclick="test('identify')">Identifikovat</button>
-  </div>
+  <button class="sec" onclick="identify()">Identifikovat</button>
 </div>
 
 <div class="card"><h2>Připojení</h2>
@@ -555,7 +540,7 @@ const $=id=>document.getElementById(id);let first=true,titles=[];
 async function j(u,o){const r=await fetch(u,o);return r.json()}
 function form(d){return{method:'POST',body:new URLSearchParams(d)}}
 async function set(d){await j('/api/set',form(d))}
-async function test(m){await j('/api/test?m='+m)}
+async function identify(){await j('/api/identify')}
 function fillInputs(sel){const s=$('input');const n=Math.max(titles.length,8,sel);s.innerHTML='';
   for(let i=1;i<=n;i++){const o=document.createElement('option');o.value=i;o.textContent=i+(titles[i-1]?' – '+titles[i-1]:'');s.appendChild(o)}
   s.value=sel}
@@ -589,7 +574,7 @@ void setupWeb() {
   server.on("/api/set",     HTTP_POST, handleSet);
   server.on("/api/wifi",    HTTP_POST, handleWifi);
   server.on("/api/scan",    HTTP_GET,  handleScan);
-  server.on("/api/test",    HTTP_GET,  handleTest);
+  server.on("/api/identify", HTTP_GET, handleIdentify);
   server.onNotFound([] {                     // captive portal v AP rezimu
     if (apMode) {
       server.sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/", true);
