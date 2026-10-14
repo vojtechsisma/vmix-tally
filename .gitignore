@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# KiCad
+schematics/.history/
+schematics/*-backups/
+schematics/fp-info-cache
+schematics/*.kicad_prl
+schematics/~*.lck
+schematics/_autosave-*
+schematics/*.bak
+schematics/*.kicad_sch-bak
+schematics/*.kicad_pcb-bak
+schematics/*.net
+schematics/*.dsn
+schematics/*.ses
+schematics/gerbers/
+
+# Arduino / build
+build/
+*.bin
+*.elf

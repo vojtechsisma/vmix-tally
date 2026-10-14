@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "tally")(type "KiCad")(uri "${KIPRJMOD}/tally.kicad_sym")(options "")(descr "vMix tally custom symbols"))
+)
