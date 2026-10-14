@@ -38,4 +38,3 @@ Parts list total from GME / Drátek: about 614 Kč (October 2026).
 - Web interface on port 80: status, input selection with names pulled from vMix, brightness, vMix IP, device name, LED test, WiFi credentials. Settings persist in NVS.
 - First boot or no WiFi: the device opens its own access point `Tally-XXXX` with a captive portal at `192.168.4.1`. Once home WiFi is configured it is reachable at `http://<name>.local`.
 - Battery voltage is averaged and shown in the web UI. The on-board blue LED blinks on low battery.
-- WiFi TX power is lowered to reduce current spikes on battery.

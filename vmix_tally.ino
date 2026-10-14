@@ -9,6 +9,7 @@
 
   Zapojeni: GPIO25 -> cervena LED (anoda), GPIO26 -> zelena LED (anoda),
             katody spolecne -> 100 R -> GND
+            Napajeni: 1x Li-ion 18650 -> TP4056/DW01 modul -> SW1 -> LF33CV -> pin 3V3
             Baterie: BAT+ -> 10k -> GPIO34 -> 10k -> GND  (delic 1:2, mereni napeti)
 
   Arduino IDE, deska "ESP32 Dev Module", jadro esp32 3.x. Zadne externi knihovny.
@@ -30,14 +31,13 @@ const int PIN_BOARD_LED = 2;   // modra LED na desce - blika pri slabe baterii
 
 // ---------------- baterie ----------------
 const float BATT_DIVIDER = 2.0;   // 10k / 10k
-const float BATT_LOW     = 2.2;   // V - pod timto varovani (2x AA)
-const float BATT_PRESENT = 1.0;   // V - pod timto = baterie nepripojena (napajeni z USB)
+const float BATT_LOW     = 3.5;   // V - pod timto varovani
+const float BATT_PRESENT = 2.5;   // V - pod timto = baterie nepripojena / SW1 vypnuty (napajeni z USB)
 const int VMIX_PORT = 8099;
 
-// Nizsi vysilaci vykon WiFi = mensi proudove spicky (pri napajeni z baterii pres step-up
-// jinak muze napeti pri startu WiFi spadnout a ESP32 se dokola restartuje).
+// Vysilaci vykon WiFi
 // Moznosti: WIFI_POWER_19_5dBm (max), 15dBm, 11dBm, WIFI_POWER_8_5dBm, 7dBm, 5dBm
-const wifi_power_t WIFI_TX_POWER = WIFI_POWER_8_5dBm;
+const wifi_power_t WIFI_TX_POWER = WIFI_POWER_19_5dBm;
 
 // ---------------- stav ----------------
 struct Config {
@@ -87,14 +87,15 @@ TallyState currentTally() {
 bool battPresent() { return battV >= BATT_PRESENT; }
 bool battLow()     { return battPresent() && battV < BATT_LOW; }
 
-// odhad nabiti pro 2x alkalicke AA (napeti pod zatezi)
+// odhad nabiti pro 1x Li-ion 18650 (Panasonic NCR18650GA, napeti pod malou zatezi)
+// DW01 na TP4056 modulu odpoji clanek pri ~2,5 V, prakticky vybito uz od ~3,0 V
 int battPercent(float v) {
-  const float cell = v / 2.0;
-  const float V[] = {1.00, 1.10, 1.20, 1.25, 1.30, 1.35, 1.40, 1.50};
-  const int   P[] = {   0,   10,   30,   45,   60,   75,   90,  100};
-  if (cell <= V[0]) return 0;
-  for (int i = 1; i < 8; i++)
-    if (cell <= V[i]) return P[i-1] + (int)((cell - V[i-1]) / (V[i] - V[i-1]) * (P[i] - P[i-1]));
+  const float V[] = {3.00, 3.30, 3.50, 3.60, 3.70, 3.80, 3.90, 4.00, 4.10, 4.20};
+  const int   P[] = {   0,    5,   15,   25,   45,   60,   75,   88,   95,  100};
+  const int   N   = sizeof(V) / sizeof(V[0]);
+  if (v <= V[0]) return 0;
+  for (int i = 1; i < N; i++)
+    if (v <= V[i]) return P[i-1] + (int)((v - V[i-1]) / (V[i] - V[i-1]) * (P[i] - P[i-1]));
   return 100;
 }
 
@@ -609,7 +610,7 @@ void setup() {
   ledcAttach(PIN_RED,   5000, 8);
   ledcAttach(PIN_GREEN, 5000, 8);
   pinMode(PIN_BOARD_LED, OUTPUT);
-  analogSetPinAttenuation(PIN_BATT, ADC_11db);   // rozsah ~0-2,5 V
+  analogSetPinAttenuation(PIN_BATT, ADC_11db);   // rozsah ~0-2,5 V linearne (4,2 V / 2 = 2,1 V)
   ledsRaw(false, false);
 
   loadConfig();
